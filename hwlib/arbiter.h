@@ -1,57 +1,96 @@
 #pragma once
 
-#include "../core.h"
-#include "decoupled.h"
-#include "counter.h"
-#include "xbar.h"
-#include "onehot.h"
+#include "core.h"
+#include "htl/decoupled.h"
+#include "htl/counter.h"
+#include "htl/xbar.h"
+#include "htl/onehot.h"
 
-namespace ch {
-namespace htl {
-
+using namespace ch::htl;
 using namespace ch::logic;
 
-template <unsigned N>
-struct ch_meshArbiter {
+// x is client num
+// y is service num
+template <unsigned xN, unsigned yN>
+struct meshArbiter {
   __io (
-    __in (ch_vec<ch_bit<N>, N>)  hot_in,
-    __out (ch_vec<ch_bit<N>, N>) grant
+    __in (ch_vec<ch_bit<yN>, xN>)  h_in,
+    __out (ch_vec<ch_bit<xN>, yN>) grant
+    // __out (ch_uint<log2ceil(yN)>) out
   );
 
   void describe() {
-    ch_vec<ch_vec<ch_int<2>, N>, N> _inmatch(false);
-    ch_vec<ch_vec<ch_bool, N>, N> _request(false);
-    ch_reg<ch_int<N>>  _pri;
+    const int yNlog2 = log2ceil(yN);
+    int xx[xN];
+    for (unsigned i = 0; i < xN; ++i) {
+      xx[i] = (yN - i) % yN;
+    }
+    // x ---->
+    // y | x0y0 x1y3 x2y2 x3y1
+    //   | x0y1 x1y0 x2y3 x3y2
+    //   | x0y2 x1y1 x2y0 x3y3
+    //   | x0y3 x1y2 x2y1 x3y0
+    //   | x0y0 x1y3 x2y2 x3y1
+    //
+    ch_reg<ch_uint<yNlog2>> rr_ctr(0);
 
-    for (int i = 0; i < N; ++i) {
-      for (int j = 0; j < N; j++) {
-        _request[i][j] = false;
-      }
-      if (ch_orr(hot_in[i])) {
-        auto oc_id = ch_hot2bin(hot_in[i]);
-        _request[i][oc_id] = 1;
+    ch_bool active(true);
+    // io.out = rr_ctr;
+#if 1
+    ch_vec<ch_vec<ch_uint<log2ceil(yN)>, xN>, yN> rry;
+
+    for (unsigned y = 0; y < yN; ++y) {
+      for (unsigned x = 0; x < xN; ++x) {
+        rry[y][x] = rr_ctr + xx[x] + y;
       }
     }
 
-    for (int p = 0; p < N; ++p) {
-      output = (_pri + p) % _outputs;
+    ch_vec<ch_vec<ch_bool, xN>, yN> ena(false);
+    ch_vec<ch_vec<ch_bool, xN>, yN> dis_x(false);
+    ch_vec<ch_vec<ch_bool, xN>, yN> dis_y(false);
 
-      // Step through the current diagonal
-      for (input = 0; input < N; ++input) {
-        if ((output < N) && (_inmatch[input] == false) &&
-          (_request[input][output])) {
-          _inmatch[input] = output;
+    for (unsigned y = 0; y < yN; ++y) {
+      for (unsigned x = 0; x < xN; ++x) {
+        ena[y][x] = ((io.h_in[x] >> rry[y][x]) == true) & (~dis_x[y][x]) & (~dis_y[y][x]);
+        ch_cout << "rry[" << y << "][" << x << "]=" <<  rry[y][x] << ", io.h_in[" << x << "]=" << io.h_in[x] << ", ena[" << y << "][" << x << "]=" << ena[y][x] << std::endl;
+      }
+      if (y > 0) {
+        for (unsigned x = 0; x < xN; ++x) {
+          int x_left;
+          if (x == 0) {
+            x_left = xN - 1;
+          } else {
+            x_left = x - 1;
+          }
+
+          dis_x[y][x] = ena[y-1][x] or dis_x[y-1][x];
+          dis_y[y][x] = ena[y-1][x_left] or dis_y[y-1][x_left];
         }
-        output = (output + 1) % _outputs;
       }
     }
 
-    _pri = (_pri + 1) % _outputs;
-
-    for (unsigned i = 0; i < N; i++) {
-      auto output = _inmatch[i];
-      io.grant[i][j] = output;
+    ch_vec<ch_bit<yN>, xN>   grant(false);
+    for (unsigned x = 0; x < xN; ++x) {
+      for (unsigned y = 0; y < yN; ++y) {
+        __if (ena[y][x]) {
+          grant[x] = (ch_bit<yN>(1) << rry[y][x]);
+          active = true;
+        };
+      }
     }
+
+    for (unsigned y = 0; y < xN; ++y) {
+      for (unsigned x = 0; x < xN; ++x) {
+        io.grant[y][x] = grant[x][y];
+        ch_cout << " io.grant[" << y << "][" << x << "]=" << io.grant[y][x] << std::endl;
+      }
+    }
+
+    __if (active) {
+      rr_ctr->next = rr_ctr + 1;
+    };
+    ch_cout << "clk=" << ch_now() << " active=" << active << " rr_ctr=" << rr_ctr << std::endl;
+#endif
   }
 };
 
@@ -92,5 +131,3 @@ struct ch_xbar_switch {
 };
 */
 
-}
-}

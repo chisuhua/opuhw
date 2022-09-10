@@ -66,7 +66,8 @@ builddir = meson.current_source_dir() + '/../3rdparty/cash/'
 
 test_src = [
   'tests/common.cpp',
-  'tests/htl.cpp',
+  'tests/arbiter.cpp',
+  'tests/counter.cpp',
   'tests/main.cpp'
   ]
 
@@ -79,6 +80,16 @@ test_src = [
 testsuite = executable(
   'testsuite',
   test_src,
+  include_directories : include_directories(test_inc),
+  install : false,
+  cpp_args : extra_cpp_args,
+  link_args : test_link_args,
+  #dependencies: declare_dependency(link_with : )
+)
+
+counter = executable(
+  'counter',
+  'examples/counter.cpp',
   include_directories : include_directories(test_inc),
   install : false,
   cpp_args : extra_cpp_args,
