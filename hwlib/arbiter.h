@@ -9,14 +9,14 @@
 using namespace ch::htl;
 using namespace ch::logic;
 
+namespace hwlib {
 // x is client num
 // y is service num
 template <unsigned xN, unsigned yN>
-struct meshArbiter {
+struct mh_arbiter {
   __io (
     __in (ch_vec<ch_bit<yN>, xN>)  h_in,
     __out (ch_vec<ch_bit<xN>, yN>) grant
-    // __out (ch_uint<log2ceil(yN)>) out
   );
 
   void describe() {
@@ -94,40 +94,52 @@ struct meshArbiter {
   }
 };
 
-/*
-template <typename T, unsigned I, typename Arbiter = ch_matArbiter<I>>
-struct ch_xbar_switch {
+template <typename T, unsigned I, unsigned O, typename Arbiter = mh_arbiter<I, O>>
+struct mh_xbar {
   using value_type   = T;
   using arbiter_type = Arbiter;
   using in_io        = ch_vec<ch_enq_io<T>, I>;
-  using out_io       = ch_deq_io<T>;
-    
+  using out_io       = ch_vec<ch_deq_io<T>, O>;
+
   __io (
     (in_io)           in,
     (out_io)          out,
-    __out (ch_bit<I>) grant
+    __in (ch_vec<ch_bit<O>, I>) h_sel,
+    __out (ch_vec<ch_bit<I>, O>) grant
   );
 
   void describe() {
-    ch_module<ch_hxbar<ch_valid_t<T>, I, 1>> xbar;
+    ch_module<ch_hxbar<ch_valid_t<T>, I, O>> xbar;
     ch_module<Arbiter> arb;
 
     for (unsigned i = 0; i < I; ++i) {
       xbar.io.in[i].data  = io.in[i].data;
       xbar.io.in[i].valid = io.in[i].valid;
-      arb.io.in[i]        = io.in[i].valid;
+      arb.io.h_in[i]      = ch_sel(io.in[i].valid, io.h_sel[i], 0);
     }
 
-    io.out.data  = xbar.io.out[0].data;
-    io.out.valid = xbar.io.out[0].valid;
-    xbar.io.sel  = arb.io.grant;
+    for (unsigned o = 0; o < O; ++o) {
+      io.out[o].data  = xbar.io.out[o].data;
+      io.out[o].valid = xbar.io.out[o].valid;
+    }
+
+    for (unsigned o = 0; o < O; ++o) {
+      ch_asliceref<I>(xbar.io.sel, o)  = arb.io.grant[o] << o*I;
+    }
+
+    ch_vec<ch_bit<O>, I> ready;
+    for (unsigned o = 0; o < O; ++o) {
+      for (unsigned i = 0; i < I; ++i) {
+        ready[i][o] = arb.io.grant[o][i];
+      }
+    }
 
     for (unsigned i = 0; i < I; ++i) {
-      io.in[i].ready = io.out.ready && arb.io.grant[i];
+      io.in[i].ready = ch_orr(ready[i]);
     }
 
     io.grant = arb.io.grant;
-  }  
+  }
 };
-*/
 
+}

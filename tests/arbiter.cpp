@@ -12,13 +12,14 @@
 #include <hwlib/arbiter.h>
 
 using namespace ch::htl;
+using namespace hwlib;
 
 TEST_CASE("arbiter", "[arbiter]") {
-  SECTION("meshArbiter", "[meshArbiter]") {
+  SECTION("mh_arbiter", "[mh_arbiter]") {
     TESTX([]()->bool {
-      ch_device<meshArbiter<4, 4>> device;
+      ch_device<mh_arbiter<4, 4>> device;
       ch_tracer sim(device);
-      ch_toVerilog("meshArbiter.v", device);
+      ch_toVerilog("mh_arbiter.v", device);
       sim.reset();
       device.io.h_in[0] = 0x0;
       device.io.h_in[1] = 0x0;
@@ -167,6 +168,22 @@ TEST_CASE("arbiter", "[arbiter]") {
       sim.toVCD("meshArbiter.vcd");
       sim.toText("meshArbiter.log");
       return !!ret;
+    });
+  }
+  SECTION("mh_xbar", "[mh_xbar]") {
+    TESTX([]()->bool {
+      ch_device<mh_xbar<ch_bit4, 2, 2>> device;
+      ch_tracer sim(device);
+      ch_toVerilog("mh_xbar.v", device);
+      sim.reset();
+      device.io.in[0].data = 0xA;
+      device.io.in[0].valid = true;
+      device.io.h_sel[0] = 0x1;
+      device.io.in[1].data = 0xB;
+      device.io.in[1].valid = true;
+      device.io.h_sel[1] = 0x1;
+      device.io.out[1].ready = true;
+      device.io.out[1].ready = true;
     });
   }
 }
