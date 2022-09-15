@@ -4,6 +4,7 @@
 #include "htl/decoupled.h"
 #include "htl/mux.h"
 #include "htl/enc.h"
+#include "hwlib/arbiter.h"
 
 namespace hwlib {
 
@@ -32,7 +33,7 @@ struct Config {
 template <typename Cfg>
 struct RegFile {
   __io (
-    (typename Cfg::req_io) req
+    ch_enq_io<(typename Cfg::req_io)> req
   );
 
 private:
@@ -40,18 +41,23 @@ private:
 public:
 
   void describe() {
-    ch_mem<rf_bits, Cfg::rf_size> rf(0); // zero initialized
+    ch_mem<rf_data_bits, Cfg::rf_size> rf(0); // zero initialized
+    io.rdata = ch_sel(read, rf.read(addr), 0);
+    rf.write(addr, io.wdata, write);
   }
 };
 
 template <typename Cfg>
 struct RegBanks {
   __io (
-    ch_vec<(typename Cfg::req_io)> client_req
+       (ch_vec<ch_enq_io(typename Cfg::req_io)>>) req
   );
 
   void describe() {
-    ch_vec<ch_module<RegFile<Cfg>>, Cfg::num_banks> refbanks;
+    ch_vec<ch_module<RegFile<Cfg>>, Cfg::num_banks> regbanks;
+    for (unsigned i = 0; i < Cfg::num_banks; ++i) {
+      regbanks.io.req[i] = io.req[i];
+    }
   }
 };
 }

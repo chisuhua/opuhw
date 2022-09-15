@@ -116,26 +116,31 @@ struct mh_xbar {
       xbar.io.in[i].data  = io.in[i].data;
       xbar.io.in[i].valid = io.in[i].valid;
       arb.io.h_in[i]      = ch_sel(io.in[i].valid, io.h_sel[i], 0);
+      ch_cout << "clk=" << ch_now() << " io.in[" << i << "]" << io.in[i].data << ", arb.io.h_in[" << i << "]" << arb.io.h_in[i] << std::endl;
     }
 
     for (unsigned o = 0; o < O; ++o) {
       io.out[o].data  = xbar.io.out[o].data;
       io.out[o].valid = xbar.io.out[o].valid;
+      ch_cout << "clk=" << ch_now() << " io.out[" << o << "]" << io.out[o].data << std::endl;
     }
 
     for (unsigned o = 0; o < O; ++o) {
-      ch_asliceref<I>(xbar.io.sel, o)  = arb.io.grant[o] << o*I;
+      ch_asliceref<I>(xbar.io.sel, o)  = arb.io.grant[o];
+      ch_cout << "clk=" << ch_now() << " arb.io.grant[" << o << "]" << arb.io.grant[o] << std::endl;
     }
+    ch_cout << "clk=" << ch_now() << " xbar.sel=" << xbar.io.sel << std::endl;
 
     ch_vec<ch_bit<O>, I> ready;
     for (unsigned o = 0; o < O; ++o) {
       for (unsigned i = 0; i < I; ++i) {
-        ready[i][o] = arb.io.grant[o][i];
+        ready[i][o] = arb.io.grant[o][i] and io.out[o].ready;
       }
     }
 
     for (unsigned i = 0; i < I; ++i) {
       io.in[i].ready = ch_orr(ready[i]);
+      ch_cout << "clk=" << ch_now() << " io.in[" << i << "].ready=" << io.in[i].ready << std::endl;
     }
 
     io.grant = arb.io.grant;
