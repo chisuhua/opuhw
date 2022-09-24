@@ -68,6 +68,7 @@ test_src = [
   'tests/common.cpp',
   'tests/arbiter.cpp',
   'tests/counter.cpp',
+  'tests/regbank.cpp',
   'tests/main.cpp'
   ]
 
